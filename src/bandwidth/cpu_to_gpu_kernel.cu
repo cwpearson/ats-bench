@@ -16,7 +16,7 @@ __device__ void copy_func(char *__restrict__ dst, const char *__restrict__ src,
   auto dstP = reinterpret_cast<T *>(dst);
   auto srcP = reinterpret_cast<const T *>(src);
 
-  for (size_t i = 0; i < nElems; i += blockDim.x * gridDim.x) {
+  for (size_t i = threadIdx.x; i < nElems; i += blockDim.x * gridDim.x) {
     dstP[i] = srcP[i];
   }
 }
