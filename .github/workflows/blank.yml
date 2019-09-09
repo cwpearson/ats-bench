@@ -16,8 +16,7 @@ jobs:
     - name: Install cuda-toolkit
       run: |
         sudo apt-get install cuda-toolkit-10-1
-        export PATH=$PATH:/usr/local/cuda/bin
-        echo $PATH
+        sudo ln -s /usr/local/cuda/bin/nvcc /usr/local/bin/nvcc
         which nvcc
     - name: configure
       run: |
