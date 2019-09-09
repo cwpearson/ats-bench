@@ -4,7 +4,13 @@ Routines for controlling CPU caching
 
 #pragma once
 
-#include <cstdlib>
+#include <algorithm>
+#include <cstdio>
+#include <iostream>
+
+#ifdef __linux__
+#include <unistd.h>
+#endif
 
 // https://gcc.gnu.org/onlinedocs/gcc/Simple-Constraints.html#Simple-Constraints
 
@@ -85,4 +91,31 @@ inline void flush_all(void *p, const size_t n) {
 
   // make flushing visible to other accesses
   barrier_all();
+}
+
+/*! return the smallest cache line size detected on the platform.
+Return 16 if the cache line size could not be detected.
+*/
+size_t cache_linesize() {
+#ifdef __linux__
+  long linesize, var;
+
+  var = sysconf(_SC_LEVEL1_DCACHE_LINESIZE);
+  linesize = var;
+
+  var = sysconf(_SC_LEVEL2_CACHE_LINESIZE);
+  linesize = var ? std::min(linesize, var) : linesize;
+
+  var = sysconf(_SC_LEVEL3_CACHE_LINESIZE);
+  linesize = var ? std::min(linesize, var) : linesize;
+
+  var = sysconf(_SC_LEVEL4_CACHE_LINESIZE);
+  linesize = var ? std::min(linesize, var) : linesize;
+
+  linesize = linesize ? linesize : 16;
+  return linesize;
+#else
+#warning "unsupported platform"
+  return 16;
+#endif
 }
