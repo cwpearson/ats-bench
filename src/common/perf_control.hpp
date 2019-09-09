@@ -97,8 +97,8 @@ int write_acpi_cpufreq_boost(const std::string &s) {
   return 0;
 }
 
-std::string readAcpiCpufreqBoost() {
-  assert(has_intel_pstate_no_turbo());
+std::string read_acpi_cpufeq_boost() {
+  assert(has_acpi_cpufreq_boost());
   std::string path("/sys/devices/system/cpu/cpufreq/boost");
   SPDLOG_LOGGER_TRACE(logger::console(), "reading {}", path);
   std::ifstream ifs(path, std::ifstream::in);
@@ -141,7 +141,7 @@ bool boost_enabled() {
   if (has_intel_pstate_no_turbo()) {
     return "0" == read_intel_pstate_no_turbo();
   } else if (has_acpi_cpufreq_boost()) {
-    return "1" == readAcpiCpufreqBoost();
+    return "1" == read_acpi_cpufeq_boost();
   } else {
     LOG(error, "unsupported system (boost)");
     return false;
