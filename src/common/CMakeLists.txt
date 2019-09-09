@@ -1,0 +1,2 @@
+
+set(BENCH_CUDA_SRCS ${BENCH_CUDA_SRCS} ${CMAKE_CURRENT_LIST_DIR}/test_system_allocator.cu PARENT_SCOPE)

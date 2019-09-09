@@ -1,0 +1,17 @@
+#pragma once
+
+#include <spdlog/sinks/stdout_color_sinks.h>
+
+/*! initialize the benchmark
+ */
+void init() {
+  static bool init_ = false;
+  if (init_)
+    return;
+
+  // create a logger and implicitly register it
+  spdlog::stdout_color_mt("console");
+
+  // don't init again if init() called twice
+  init_ = true;
+}
