@@ -16,11 +16,17 @@ jobs:
     - name: apt update
       run: sudo apt-get update
     - name: Install cuda-toolkit
-      run: sudo apt-get install cuda-toolkit-10-1
+      run: |
+        sudo apt-get install cuda-toolkit-10-1
+        export PATH=$PATH:/usr/local/cuda/bin
     - name: configure
       run: |
         mkdir build
         cd build
+        cmake --version
         cmake .. -DCMAKE_BUILD_TYPE=Debug
     - name: build
-      run: make
+      run: |
+        g++ --version
+        nvcc --version
+        make
