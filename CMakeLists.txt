@@ -36,10 +36,12 @@ if (CMAKE_BUILD_TYPE MATCHES Debug)
 #   add_definitions(-DSPDLOG_TRACE_ON)
 #   add_definitions(-DSPDLOG_DEBUG_ON)
   add_definitions(-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)
+  set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} -G)
 elseif (CMAKE_BUILD_TYPE MATCHES Release)
   add_definitions(-DNDEBUG)
 #   add_definitions(-DSPDLOG_DEBUG_ON)
   add_definitions(-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG)
+  set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} -lineinfo)
 endif()
 
 # removed -Wredundant-decls for cuda 10.1
