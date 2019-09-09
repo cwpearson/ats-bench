@@ -3,10 +3,8 @@ name: CI
 on: [push]
 
 jobs:
-  build:
-
+  build_cuda10.1:
     runs-on: ubuntu-latest
-    
     steps:
     - uses: actions/checkout@v1
     - name: add repo key
@@ -19,8 +17,11 @@ jobs:
       run: |
         sudo apt-get install cuda-toolkit-10-1
         export PATH=$PATH:/usr/local/cuda/bin
+        echo $PATH
+        which nvcc
     - name: configure
       run: |
+        echo $PATH
         mkdir build
         cd build
         cmake --version
