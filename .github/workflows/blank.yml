@@ -13,9 +13,9 @@ jobs:
       run: sudo add-apt-repository "deb http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/ /"
     - name: apt update
       run: sudo apt-get update
-    - name: Install cuda-toolkit
+    - name: Install cuda
       run: |
-        sudo apt-get install cuda-toolkit-10-1
+        sudo apt-get install cuda-toolkit-10-1 cuda-libraries-10-1 cuda-libraries-dev-10-1
         export PATH=$PATH:/usr/local/cuda/bin
         echo $PATH
         which nvcc
