@@ -186,25 +186,25 @@ int main(int argc, char **argv) {
     CUDA_RUNTIME(cudaEventElapsedTime(&millis, start, stop));
     double bytesPerSec = (nBytes / millis) * 1e3;
     fmt::print("{} {} {}\n", nBytes, bytesPerSec, millis / 1e3);
-
-    // free memory
-    switch (hostAllocMethod) {
-    case SYSTEM: {
-      delete[] src;
-      break;
-    }
-    case MANAGED: {
-      CUDA_RUNTIME(cudaFree(src));
-      break;
-    }
-    default: {
-      LOG(error, "unexpected value for hostAllocMethod");
-      exit(EXIT_FAILURE);
-    }
-    }
-
-    CUDA_RUNTIME(cudaFree(dst));
   }
+
+  // free memory
+  switch (hostAllocMethod) {
+  case SYSTEM: {
+    delete[] src;
+    break;
+  }
+  case MANAGED: {
+    CUDA_RUNTIME(cudaFree(src));
+    break;
+  }
+  default: {
+    LOG(error, "unexpected value for hostAllocMethod");
+    exit(EXIT_FAILURE);
+  }
+  }
+
+  CUDA_RUNTIME(cudaFree(dst));
 
   // destroy stream
   for (auto stream : streams) {
