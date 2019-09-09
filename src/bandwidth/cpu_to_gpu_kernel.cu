@@ -9,9 +9,8 @@
 #include "common/test_system_allocator.hpp"
 
 template <typename T>
-__forceinline__ __device__ void copy_func(char *__restrict__ dst,
-                                          const char *__restrict__ src,
-                                          const size_t n) {
+__device__ void copy_func(char *__restrict__ dst, const char *__restrict__ src,
+                          const size_t n) {
   const size_t nElems = n / sizeof(T);
 
   auto dstP = reinterpret_cast<T *>(dst);
@@ -32,11 +31,13 @@ __global__ void copy_kernel(char *__restrict__ dst,
   size_t rem = n - (n / sizeof(T));
   char *dstTail = &dst[n - rem];
   const char *srcTail = &src[n - rem];
-  copy_func<char>(dstTail, srcTail, n);
+  copy_func<char>(dstTail, srcTail, n - rem);
 }
 
 int main(int argc, char **argv) {
   init();
+
+  enum HostAllocMethod { SYSTEM, MANAGED };
 
   bool help = false;
   bool debug = false;
@@ -44,17 +45,36 @@ int main(int argc, char **argv) {
   bool noAtsCheck = false;
   bool strictPerf = false;
   bool flush = false;
-  size_t n = 0;
+  int nIters = 5;
+  size_t nBytes = 1024 * 1024;
+  HostAllocMethod hostAllocMethod = SYSTEM;
 
   auto cli =
       lyra::help(help) |
       lyra::opt(debug)["--debug"]("print debug messages to stderr") |
       lyra::opt(verbose)["--verbose"]("print verbose messages to stderr") |
-      lyra::opt(noAtsCheck)["--no-ats-check"]("skip test for ats") |
+      lyra::opt(noAtsCheck)["--no-ats-check"]("skip test for ATS") |
       lyra::opt(flush)["--flush"]("flush CPU cache") |
       lyra::opt(strictPerf)["--strict-perf"](
           "fail if system performance cannot be controlled") |
-      lyra::arg(n, "size")("Size").required();
+      lyra::opt(nIters,
+                "iters")["-i"]["--iters"]("number of benchmark iterations") |
+      lyra::opt(
+          [&](std::string s) {
+            if ("system" == s) {
+              hostAllocMethod = SYSTEM;
+              return lyra::parser_result::ok(lyra::parser_result_type::matched);
+            } else if ("managed" == s) {
+              hostAllocMethod = MANAGED;
+              return lyra::parser_result::ok(lyra::parser_result_type::matched);
+            } else {
+              return lyra::parser_result::runtimeError(
+                  "alloc-method must be system,managed");
+            }
+          },
+          "method")["--alloc-method"](
+          "host allocation method (system, managed)") |
+      lyra::arg(nBytes, "size")("Size").required();
 
   auto result = cli.parse({argc, argv});
   if (!result) {
@@ -89,7 +109,7 @@ int main(int argc, char **argv) {
   }
 
   // test system allocator before any CUDA
-  if (!noAtsCheck) {
+  if (hostAllocMethod == SYSTEM && !noAtsCheck) {
     if (test_system_allocator()) {
       LOG(info, "CUDA supports system allocator");
     } else {
@@ -105,28 +125,27 @@ int main(int argc, char **argv) {
   WithoutBoost boostDisabler(strictPerf);
 
   typedef int32_t Type;
-  const size_t nElems = n;
-  const size_t nBytes = nElems * sizeof(Type);
   char *dst;
   CUDA_RUNTIME(cudaMalloc(&dst, nBytes));
-  char *src = new char[n * sizeof(Type)];
+  char *src = nullptr;
+  switch (hostAllocMethod) {
+  case SYSTEM: {
+    src = new char[nBytes];
+    break;
+  }
+  case MANAGED: {
+    CUDA_RUNTIME(cudaMallocManaged(&src, nBytes));
+    break;
+  }
+  default: {
+    LOG(error, "unexpected value for hostAllocMethod");
+    exit(EXIT_FAILURE);
+  }
+  }
+
   if (!src) {
     LOG(critical, "failed allocation");
     exit(EXIT_FAILURE);
-  }
-
-  // touch all src lines
-  LOG(info, "CPU touch src allocation");
-  const size_t lineSize = cache_linesize();
-  LOG(debug, "CPU line size {}", lineSize);
-  for (size_t i = 0; i < nElems; i += lineSize / sizeof(Type)) {
-    src[i] = 0;
-  }
-
-  // flush src pages from cache
-  if (flush) {
-    LOG(info, "flush CPU cache");
-    flush_all(src, nBytes);
   }
 
   // create stream
@@ -138,19 +157,54 @@ int main(int argc, char **argv) {
   CUDA_RUNTIME(cudaEventCreate(&start));
   CUDA_RUNTIME(cudaEventCreate(&stop));
 
-  // copy to GPU
-  LOG(info, "operation");
-  CUDA_RUNTIME(cudaEventRecord(start, streams[0]));
-  copy_kernel<uint32_t><<<250, 512, 0, streams[0]>>>(dst, src, nBytes);
-  CUDA_RUNTIME(cudaEventRecord(stop, streams[0]));
+  for (int i = 0; i < nIters; ++i) {
+    // touch all src lines
+    LOG(debug, "CPU touch src allocation");
+    const size_t lineSize = cache_linesize();
+    LOG(debug, "CPU line size {}", lineSize);
+    for (size_t j = 0; j < nBytes; j += lineSize) {
+      src[j] = 0;
+    }
 
-  // wait for copy to be done
-  CUDA_RUNTIME(cudaEventSynchronize(stop));
+    // flush src pages from cache
+    if (flush) {
+      LOG(debug, "flush CPU cache");
+      flush_all(src, nBytes);
+    }
 
-  float millis;
-  CUDA_RUNTIME(cudaEventElapsedTime(&millis, start, stop));
-  double bytesPerSec = (nBytes / millis) * 1e3;
-  fmt::print("{} {} {}\n", nBytes, bytesPerSec, millis / 1e3);
+    // copy to GPU
+    LOG(debug, "operation");
+    CUDA_RUNTIME(cudaEventRecord(start, streams[0]));
+    copy_kernel<Type><<<250, 512, 0, streams[0]>>>(dst, src, nBytes);
+    CUDA_RUNTIME(cudaGetLastError());
+    CUDA_RUNTIME(cudaEventRecord(stop, streams[0]));
+
+    // wait for copy to be done
+    CUDA_RUNTIME(cudaEventSynchronize(stop));
+
+    float millis;
+    CUDA_RUNTIME(cudaEventElapsedTime(&millis, start, stop));
+    double bytesPerSec = (nBytes / millis) * 1e3;
+    fmt::print("{} {} {}\n", nBytes, bytesPerSec, millis / 1e3);
+
+    // free memory
+    switch (hostAllocMethod) {
+    case SYSTEM: {
+      delete[] src;
+      break;
+    }
+    case MANAGED: {
+      CUDA_RUNTIME(cudaFree(src));
+      break;
+    }
+    default: {
+      LOG(error, "unexpected value for hostAllocMethod");
+      exit(EXIT_FAILURE);
+    }
+    }
+
+    CUDA_RUNTIME(cudaFree(dst));
+  }
 
   // destroy stream
   for (auto stream : streams) {
