@@ -3,7 +3,7 @@ name: CI
 on: [push]
 
 jobs:
-  build_cuda10.1:
+  build_cuda10-1:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
