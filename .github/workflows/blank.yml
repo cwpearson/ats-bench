@@ -15,9 +15,8 @@ jobs:
       run: sudo apt-get update
     - name: Install cuda
       run: |
-        sudo apt-get install cuda-toolkit-10-1 cuda-libraries-10-1 cuda-libraries-dev-10-1
-        export PATH=$PATH:/usr/local/cuda/bin
-        echo $PATH
+        sudo apt-get install cuda-toolkit-10-1 cuda-libraries-dev-10-1 cuda-libraries-10-1
+        sudo ln -s /usr/local/cuda/bin/nvcc /usr/local/bin/nvcc
         which nvcc
     - name: configure
       run: |
