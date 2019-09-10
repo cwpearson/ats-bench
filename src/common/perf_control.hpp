@@ -159,30 +159,33 @@ std::vector<unsigned int> get_device_memory_clocks(unsigned int index) {
   NVML(nvmlInit());
   std::vector<unsigned int> result;
   nvmlDevice_t device;
-  NVML(nvmlDeviceGetHandleByIndex (index, &device ));
+  NVML(nvmlDeviceGetHandleByIndex(index, &device));
   unsigned int resultCount = 0;
 
-  auto ret = nvmlDeviceGetSupportedMemoryClocks (device, &resultCount, nullptr );
-    if (ret != NVML_ERROR_INSUFFICIENT_SIZE) {
-    NVML(ret);
-  }
-  result.resize(resultCount);
-  NVML(nvmlDeviceGetSupportedMemoryClocks (device, &resultCount, result.data()));
-  return result;
-}
-
-std::vector<unsigned int> get_device_graphics_clocks(unsigned int index, unsigned int memoryClockMhz) {
-  NVML(nvmlInit());
-  std::vector<unsigned int> result;
-  nvmlDevice_t device;
-  NVML(nvmlDeviceGetHandleByIndex (index, &device ));
-  unsigned int resultCount = 0;
-  auto ret = nvmlDeviceGetSupportedGraphicsClocks (device, memoryClockMhz, & resultCount, nullptr );
+  auto ret = nvmlDeviceGetSupportedMemoryClocks(device, &resultCount, nullptr);
   if (ret != NVML_ERROR_INSUFFICIENT_SIZE) {
     NVML(ret);
   }
   result.resize(resultCount);
-  NVML(nvmlDeviceGetSupportedGraphicsClocks (device,memoryClockMhz, & resultCount, result.data())); 
+  NVML(nvmlDeviceGetSupportedMemoryClocks(device, &resultCount, result.data()));
+  return result;
+}
+
+std::vector<unsigned int>
+get_device_graphics_clocks(unsigned int index, unsigned int memoryClockMhz) {
+  NVML(nvmlInit());
+  std::vector<unsigned int> result;
+  nvmlDevice_t device;
+  NVML(nvmlDeviceGetHandleByIndex(index, &device));
+  unsigned int resultCount = 0;
+  auto ret = nvmlDeviceGetSupportedGraphicsClocks(device, memoryClockMhz,
+                                                  &resultCount, nullptr);
+  if (ret != NVML_ERROR_INSUFFICIENT_SIZE) {
+    NVML(ret);
+  }
+  result.resize(resultCount);
+  NVML(nvmlDeviceGetSupportedGraphicsClocks(device, memoryClockMhz,
+                                            &resultCount, result.data()));
   return result;
 }
 
@@ -280,45 +283,52 @@ struct WithMaxGPUClocks {
 
   WithMaxGPUClocks(std::vector<int> gpus = {0}, bool strict = false) {
     for (auto gpu : gpus) {
-    auto memClocks = get_device_memory_clocks(gpu);
-    unsigned int maxMem = *std::max_element(memClocks.begin(), memClocks.end());
-    auto coreClocks = get_device_graphics_clocks(gpu, maxMem);
-    unsigned int maxCore = *std::max_element(coreClocks.begin(), coreClocks.end());
-    LOG(debug, "mem: {} core: {}", maxMem, maxCore);
+      auto memClocks = get_device_memory_clocks(gpu);
+      unsigned int maxMem =
+          *std::max_element(memClocks.begin(), memClocks.end());
+      auto coreClocks = get_device_graphics_clocks(gpu, maxMem);
+      unsigned int maxCore =
+          *std::max_element(coreClocks.begin(), coreClocks.end());
+      LOG(debug, "mem: {} core: {}", maxMem, maxCore);
 
-    nvmlDevice_t device;
-    NVML(nvmlDeviceGetHandleByIndex (gpu, &device ));
-    LOG(debug, "try set GPU {} mem: {} core: {}", gpu, maxMem, maxCore);
-    auto ret = nvmlDeviceSetApplicationsClocks ( device, maxMem, maxCore );
-    if (ret == NVML_ERROR_NOT_SUPPORTED) {
-      LOG(warn, "GPU {} does not support setting application clocks", gpu);
-    } else if (ret == NVML_ERROR_NO_PERMISSION) {
-      LOG(warn, "user does not have permission to set GPU {} application clocks", gpu);
-    } else {
-      NVML(ret);
-      resetClocks.insert(device);
-    }
-    LOG(debug, "try disable GPU {} boost clock", gpu);
-    ret = nvmlDeviceSetAutoBoostedClocksEnabled ( device, NVML_FEATURE_DISABLED );
-    if (ret == NVML_ERROR_NOT_SUPPORTED) {
-      LOG(warn, "GPU {} does not support disable boost clocks", 0);
-    } else if (ret == NVML_ERROR_NO_PERMISSION) {
-      LOG(warn, "user does not have permission to disable GPU {} boost clocks", gpu);
-    } else {
-      NVML(ret);
-      resetBoost.insert(device);
-    }
+      nvmlDevice_t device;
+      NVML(nvmlDeviceGetHandleByIndex(gpu, &device));
+      LOG(debug, "try set GPU {} mem: {} core: {}", gpu, maxMem, maxCore);
+      auto ret = nvmlDeviceSetApplicationsClocks(device, maxMem, maxCore);
+      if (ret == NVML_ERROR_NOT_SUPPORTED) {
+        LOG(warn, "GPU {} does not support setting application clocks", gpu);
+      } else if (ret == NVML_ERROR_NO_PERMISSION) {
+        LOG(warn,
+            "user does not have permission to set GPU {} application clocks",
+            gpu);
+      } else {
+        NVML(ret);
+        resetClocks.insert(device);
+      }
+      LOG(debug, "try disable GPU {} boost clock", gpu);
+      ret =
+          nvmlDeviceSetAutoBoostedClocksEnabled(device, NVML_FEATURE_DISABLED);
+      if (ret == NVML_ERROR_NOT_SUPPORTED) {
+        LOG(warn, "GPU {} does not support disable boost clocks", WithMaxGPUClocks);
+      } else if (ret == NVML_ERROR_NO_PERMISSION) {
+        LOG(warn,
+            "user does not have permission to disable GPU {} boost clocks",
+            gpu);
+      } else {
+        NVML(ret);
+        resetBoost.insert(device);
+      }
     }
   }
 
   ~WithMaxGPUClocks() {
     for (auto device : resetClocks) {
       LOG(debug, "resetting GPU clocks");
-      NVML(nvmlDeviceResetApplicationsClocks ( device ) );
+      NVML(nvmlDeviceResetApplicationsClocks(device));
     }
     for (auto device : resetBoost) {
       LOG(debug, "resetting GPU boost");
-      NVML(nvmlDeviceSetAutoBoostedClocksEnabled ( device, NVML_FEATURE_ENABLED ));
+      NVML(nvmlDeviceSetAutoBoostedClocksEnabled(device, NVML_FEATURE_ENABLED));
     }
   }
 };
