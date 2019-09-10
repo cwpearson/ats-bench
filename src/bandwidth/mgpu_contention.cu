@@ -47,7 +47,7 @@ __global__ void contention_kernel(volatile char *data, const size_t n,
 
 std::string get_header(const std::string &sep, const size_t nIters) {
   std::string result;
-  result = "bmark" + sep + "alloc" + sep + "stride" + sep + "gpus";
+  result = "bmark" + sep + "alloc" + sep + "gpus" + sep + "stride";
   for (size_t i = 0; i < nIters; ++i) {
     result += sep + fmt::format("{}", i);
   }
@@ -248,7 +248,7 @@ int main(int argc, char **argv) {
   }
   std::string output =
       fmt::format("{}{}{}{}{}{}{}", "mgpu-contention", sep, allocMethodString,
-                  sep, stride, sep, gpuString);
+                  sep, gpuString, sep, stride);
   output += sep + to_string(updatesPerSec);
   fmt::print("{}\n", output);
 
