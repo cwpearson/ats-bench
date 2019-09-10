@@ -120,9 +120,10 @@ int main(int argc, char **argv) {
   if (gpus.empty()) {
     gpus.push_back(0);
   }
-  for (auto gpu : gpus) {
-    LOG(info, gpu);
-  }
+
+#ifndef NDEBUG
+  LOG(warn, "this is not a release build.");
+#endif
 
   // test system allocator before any GPU stuff happens
   if (allocMethod == SYSTEM && !noAtsCheck) {
@@ -168,6 +169,11 @@ int main(int argc, char **argv) {
     exit(EXIT_FAILURE);
   }
 
+  // zero allocation
+  for (size_t i = 0; i < nBytes; ++i) {
+    data[i] = 0;
+  }
+
   // create one stream per gpu
   std::vector<cudaStream_t> streams;
   for (const auto gpu : gpus) {
@@ -180,11 +186,11 @@ int main(int argc, char **argv) {
   for (int i = 0; i < nIters; ++i) {
 
     // run the workload
-    LOG(debug, "operation");
     auto wct = std::chrono::system_clock::now();
     for (size_t j = 0; j < gpus.size(); ++j) {
       auto gpu = gpus[j];
       auto stream = streams[j];
+      LOG(debug, "launch contention_kernel<<<250, 512, 0, {}>>> on {}", uintptr_t(stream), gpu);
       CUDA_RUNTIME(cudaSetDevice(gpu));
       contention_kernel<<<250, 512, 0, stream>>>(data, nBytes, stride, j,
                                                  gpus.size());
@@ -197,9 +203,17 @@ int main(int argc, char **argv) {
     }
     auto elapsed = (std::chrono::system_clock::now() - wct).count() / 1e9;
 
-    const size_t numUpdates = nBytes / gpus.size() * 1000;
+    const size_t numUpdates = nBytes * 1000;
     const double updatesPerSec = numUpdates / elapsed;
-    fmt::print("{} {} {} {}\n", nBytes, numUpdates, updatesPerSec, elapsed);
+    fmt::print("{} {} {} {} {} {}\n", "mgpu-contention", stride, numUpdates, elapsed, updatesPerSec, nBytes);
+  }
+
+  // check allocation
+  for (size_t i = 0; i < nBytes; ++i) {
+    if (data[i] != data[0]) {
+      LOG(critical, "kernel bug: {} != {}", int(data[i]), int(data[0]));
+      exit(EXIT_FAILURE);
+    }
   }
 
   // free memory
