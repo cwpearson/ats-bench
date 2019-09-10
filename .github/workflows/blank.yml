@@ -21,6 +21,8 @@ jobs:
     - name: configure
       run: |
         echo $PATH
+        ls /usr/local/cuda/nvvm/libdevice
+        cat /usr/local/cuda/bin/nvcc.profile
         mkdir build
         cd build
         cmake --version
