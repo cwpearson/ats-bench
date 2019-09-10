@@ -289,7 +289,9 @@ struct WithMaxGPUClocks {
     LOG(debug, "try set GPU {} mem: {} core: {}", gpu, maxMem, maxCore);
     auto ret = nvmlDeviceSetApplicationsClocks ( device, maxMem, maxCore );
     if (ret == NVML_ERROR_NOT_SUPPORTED) {
-      LOG(warn, "GPU {} does not support setting application clocks", 0);
+      LOG(warn, "GPU {} does not support setting application clocks", gpu);
+    } else if (ret == NVML_ERROR_NO_PERMISSION) {
+      LOG(warn, "user does not have permission to set GPU {} application clocks", gpu);
     } else {
       NVML(ret);
       resetClocks.insert(device);
@@ -298,6 +300,8 @@ struct WithMaxGPUClocks {
     ret = nvmlDeviceSetAutoBoostedClocksEnabled ( device, NVML_FEATURE_DISABLED );
     if (ret == NVML_ERROR_NOT_SUPPORTED) {
       LOG(warn, "GPU {} does not support disable boost clocks", 0);
+    } else if (ret == NVML_ERROR_NO_PERMISSION) {
+      LOG(warn, "user does not have permission to disable GPU {} boost clocks", gpu);
     } else {
       NVML(ret);
       resetBoost.insert(device);
