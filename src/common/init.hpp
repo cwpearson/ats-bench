@@ -15,7 +15,7 @@ void init() {
   spdlog::stdout_color_mt("console");
 
   // init nvml
-  // NVML(nvmlInit());
+  NVML(nvmlInit());
 
   // don't init again if init() called twice
   init_ = true;
