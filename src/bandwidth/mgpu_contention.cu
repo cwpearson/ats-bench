@@ -120,6 +120,9 @@ int main(int argc, char **argv) {
   if (gpus.empty()) {
     gpus.push_back(0);
   }
+  for (auto gpu : gpus) {
+    LOG(info, gpu);
+  }
 
   // test system allocator before any GPU stuff happens
   if (allocMethod == SYSTEM && !noAtsCheck) {
