@@ -26,12 +26,19 @@ __global__ void contention_kernel(volatile char *data, const size_t n,
                                   const size_t numWorkers) {
 
   // modify field when its in a chunk chunks % workerId == 0
-  for (size_t i = threadIdx.x; i < n; i += gridDim.x * blockDim.x) {
+  for (size_t i = threadIdx.x + blockIdx.x * blockDim.x; i < n; i += gridDim.x * blockDim.x) {
     size_t chunkIdx = (i / stride) * numWorkers + workerId;
     size_t fieldIdx = i % stride;
-    size_t dataIdx = chunkIdx * stride * numWorkers + fieldIdx;
-    for (size_t j = 0; j < 1000; ++j) {
-      data[dataIdx] += 1;
+    size_t dataIdx = chunkIdx * stride + fieldIdx;
+    // if (chunkIdx == 0 || chunkIdx == 1) {
+    //   printf("%lu %lu %lu %lu\n", i, chunkIdx, fieldIdx, dataIdx);
+    // }
+    if (dataIdx < n) {
+      for (size_t j = 0; j < 1000; ++j) {
+        data[dataIdx] += 1;
+      }
+    } else {
+    break;
     }
   }
 }
@@ -170,9 +177,9 @@ int main(int argc, char **argv) {
   }
 
   // zero allocation
-  for (size_t i = 0; i < nBytes; ++i) {
-    data[i] = 0;
-  }
+  // for (size_t i = 0; i < nBytes; ++i) {
+  //   data[i] = 0;
+  // }
 
   // create one stream per gpu
   std::vector<cudaStream_t> streams;
@@ -209,12 +216,12 @@ int main(int argc, char **argv) {
   }
 
   // check allocation
-  for (size_t i = 0; i < nBytes; ++i) {
-    if (data[i] != data[0]) {
-      LOG(critical, "kernel bug: {} != {}", int(data[i]), int(data[0]));
-      exit(EXIT_FAILURE);
-    }
-  }
+  // for (size_t i = 0; i < nBytes; ++i) {
+  //   if (data[i] != data[0]) {
+  //     LOG(critical, "kernel bug: {}@{} != {}@0", int(data[i]), i, int(data[0]));
+  //     exit(EXIT_FAILURE);
+  //   }
+  // }
 
   // free memory
   switch (allocMethod) {
