@@ -37,6 +37,7 @@ __global__ void contention_kernel(volatile char *data, const size_t n,
 }
 
 int main(int argc, char **argv) {
+  // init the benchmark library
   init();
 
   enum AllocMethod { SYSTEM, MANAGED, MAPPED };
@@ -120,7 +121,7 @@ int main(int argc, char **argv) {
     gpus.push_back(0);
   }
 
-  // test system allocator before any CUDA
+  // test system allocator before any GPU stuff happens
   if (allocMethod == SYSTEM && !noAtsCheck) {
     if (test_system_allocator()) {
       LOG(info, "CUDA supports system allocator");

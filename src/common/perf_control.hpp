@@ -156,6 +156,7 @@ int nProcessorsOnln() { return sysconf(_SC_NPROCESSORS_ONLN); }
 // https://docs.nvidia.com/deploy/nvml-api/group__nvmlDeviceCommands.html#group__nvmlDeviceCommands_1gc2a9a8db6fffb2604d27fd67e8d5d87f
 
 std::vector<unsigned int> get_device_memory_clocks(unsigned int index) {
+  NVML(nvmlInit());
   std::vector<unsigned int> result;
   nvmlDevice_t device;
   NVML(nvmlDeviceGetHandleByIndex (index, &device ));
@@ -171,6 +172,7 @@ std::vector<unsigned int> get_device_memory_clocks(unsigned int index) {
 }
 
 std::vector<unsigned int> get_device_graphics_clocks(unsigned int index, unsigned int memoryClockMhz) {
+  NVML(nvmlInit());
   std::vector<unsigned int> result;
   nvmlDevice_t device;
   NVML(nvmlDeviceGetHandleByIndex (index, &device ));
