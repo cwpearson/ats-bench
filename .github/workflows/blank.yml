@@ -16,19 +16,16 @@ jobs:
     - name: Install cuda
       run: |
         sudo apt-get install cuda-toolkit-10-1 cuda-libraries-dev-10-1 cuda-libraries-10-1
-        sudo ln -s /usr/local/cuda/bin/nvcc /usr/local/bin/nvcc
-        which nvcc
     - name: configure
       run: |
-        echo $PATH
-        ls /usr/local/cuda/nvvm/libdevice
-        cat /usr/local/cuda/bin/nvcc.profile
+        export PATH=/usr/local/cuda/bin:$PATH
         mkdir build
         cd build
         cmake --version
         cmake .. -DCMAKE_BUILD_TYPE=Debug
     - name: build
       run: |
+        export PATH=/usr/local/cuda/bin:$PATH
         g++ --version
         nvcc --version
         make
