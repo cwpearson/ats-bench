@@ -17,9 +17,11 @@ done
 #include <cassert>
 #include <fstream>
 #include <map>
+#include <set>
 
 #include <unistd.h>
 
+#include "check_nvml.cuh"
 #include "logger.hpp"
 
 std::string get_governor(const int cpu) {
@@ -127,10 +129,10 @@ int enable_boost() {
  */
 bool disable_boost() {
   if (has_intel_pstate_no_turbo()) {
-    LOG(debug, "disable boost with intel_pstate");
+    LOG(debug, "try disable boost with intel_pstate");
     return write_intel_pstate_no_turbo("1");
   } else if (has_acpi_cpufreq_boost()) {
-    LOG(debug, "disable boost with acpi cpufreq");
+    LOG(debug, "try disable boost with acpi cpufreq");
     return write_acpi_cpufreq_boost("0");
   }
   LOG(error, "unsupported system");
@@ -150,6 +152,38 @@ bool boost_enabled() {
 
 int nProcessorsOnln() { return sysconf(_SC_NPROCESSORS_ONLN); }
 
+// Control GPU clock:
+// https://docs.nvidia.com/deploy/nvml-api/group__nvmlDeviceCommands.html#group__nvmlDeviceCommands_1gc2a9a8db6fffb2604d27fd67e8d5d87f
+
+std::vector<unsigned int> get_device_memory_clocks(unsigned int index) {
+  std::vector<unsigned int> result;
+  nvmlDevice_t device;
+  NVML(nvmlDeviceGetHandleByIndex (index, &device ));
+  unsigned int resultCount = 0;
+
+  auto ret = nvmlDeviceGetSupportedMemoryClocks (device, &resultCount, nullptr );
+    if (ret != NVML_ERROR_INSUFFICIENT_SIZE) {
+    NVML(ret);
+  }
+  result.resize(resultCount);
+  NVML(nvmlDeviceGetSupportedMemoryClocks (device, &resultCount, result.data()));
+  return result;
+}
+
+std::vector<unsigned int> get_device_graphics_clocks(unsigned int index, unsigned int memoryClockMhz) {
+  std::vector<unsigned int> result;
+  nvmlDevice_t device;
+  NVML(nvmlDeviceGetHandleByIndex (index, &device ));
+  unsigned int resultCount = 0;
+  auto ret = nvmlDeviceGetSupportedGraphicsClocks (device, memoryClockMhz, & resultCount, nullptr );
+  if (ret != NVML_ERROR_INSUFFICIENT_SIZE) {
+    NVML(ret);
+  }
+  result.resize(resultCount);
+  NVML(nvmlDeviceGetSupportedGraphicsClocks (device,memoryClockMhz, & resultCount, result.data())); 
+  return result;
+}
+
 struct WithPerformance {
   std::map<int, std::string> governors;
   std::map<int, bool> needsRestore;
@@ -161,7 +195,7 @@ struct WithPerformance {
       const std::string current = get_governor(cpu);
       governors[cpu] = current;
       if ("performance" == current) {
-        LOG(debug, "cpu {} already set to performance", cpu);
+        LOG(debug, "cpu {} governor already set to performance", cpu);
         needsRestore[cpu] = false;
       } else {
         if (set_governor_performance(cpu)) {
@@ -208,10 +242,10 @@ struct WithoutBoost {
     if (enabled) {
       if (disable_boost()) {
         if (strict_) {
-          LOG(critical, "unable to disable boost");
+          LOG(critical, "can't disable CPU boost");
           exit(EXIT_FAILURE);
         } else {
-          LOG(warn, "unable to disable boost");
+          LOG(warn, "can't disable CPU boost");
         }
         restore = false;
       } else {
@@ -234,6 +268,51 @@ struct WithoutBoost {
           }
         }
       }
+    }
+  }
+};
+
+struct WithMaxGPUClocks {
+  std::set<nvmlDevice_t> resetClocks;
+  std::set<nvmlDevice_t> resetBoost;
+
+  WithMaxGPUClocks(std::vector<int> gpus = {0}, bool strict = false) {
+    for (auto gpu : gpus) {
+    auto memClocks = get_device_memory_clocks(gpu);
+    unsigned int maxMem = *std::max_element(memClocks.begin(), memClocks.end());
+    auto coreClocks = get_device_graphics_clocks(gpu, maxMem);
+    unsigned int maxCore = *std::max_element(coreClocks.begin(), coreClocks.end());
+    LOG(debug, "mem: {} core: {}", maxMem, maxCore);
+
+    nvmlDevice_t device;
+    NVML(nvmlDeviceGetHandleByIndex (gpu, &device ));
+    LOG(debug, "try set GPU {} mem: {} core: {}", gpu, maxMem, maxCore);
+    auto ret = nvmlDeviceSetApplicationsClocks ( device, maxMem, maxCore );
+    if (ret == NVML_ERROR_NOT_SUPPORTED) {
+      LOG(warn, "GPU {} does not support setting application clocks", 0);
+    } else {
+      NVML(ret);
+      resetClocks.insert(device);
+    }
+    LOG(debug, "try disable GPU {} boost clock", gpu);
+    ret = nvmlDeviceSetAutoBoostedClocksEnabled ( device, NVML_FEATURE_DISABLED );
+    if (ret == NVML_ERROR_NOT_SUPPORTED) {
+      LOG(warn, "GPU {} does not support disable boost clocks", 0);
+    } else {
+      NVML(ret);
+      resetBoost.insert(device);
+    }
+    }
+  }
+
+  ~WithMaxGPUClocks() {
+    for (auto device : resetClocks) {
+      LOG(debug, "resetting GPU clocks");
+      NVML(nvmlDeviceResetApplicationsClocks ( device ) );
+    }
+    for (auto device : resetBoost) {
+      LOG(debug, "resetting GPU boost");
+      NVML(nvmlDeviceSetAutoBoostedClocksEnabled ( device, NVML_FEATURE_ENABLED ));
     }
   }
 };

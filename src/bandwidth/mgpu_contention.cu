@@ -8,17 +8,30 @@
 #include "common/perf_control.hpp"
 #include "common/test_system_allocator.hpp"
 
+/*!
+
+0 1 2 3 4 5 6 7 8 9 10 11 12
+
+0 0 1 1 2 2 3 3 4 4 5 5 6  6
+
+0 1 0_1 2 3 2_3 4 5 4_5 6  7
+
+0 1 2 3 0_1_2_3 4 5  6  7  4_5_6_7
+
+
+This kernel does (n / numWorkers) * 1000 updates to memory
+*/
 __global__ void contention_kernel(volatile char *data, const size_t n,
                                   const size_t stride, const size_t workerId,
                                   const size_t numWorkers) {
 
-  const size_t numChunks = n / stride;
-
   // modify field when its in a chunk chunks % workerId == 0
-  for (size_t i = stride * (threadIdx.x * numWorkers + workerId); i < numChunks;
-       i += stride * gridDim.x * blockDim.x * numWorkers) {
-    for (size_t j = 0; j < 10000; ++j) {
-      data[i] += 1;
+  for (size_t i = threadIdx.x; i < n; i += gridDim.x * blockDim.x) {
+    size_t chunkIdx = (i / stride) * numWorkers + workerId;
+    size_t fieldIdx = i % stride;
+    size_t dataIdx = chunkIdx * numWorkers + fieldIdx;
+    for (size_t j = 0; j < 1000; ++j) {
+      data[dataIdx] += 1;
     }
   }
 }
@@ -120,6 +133,9 @@ int main(int argc, char **argv) {
   // disable CPU boosting
   WithoutBoost boostDisabler(strictPerf);
 
+  // lock GPU clocks
+  WithMaxGPUClocks clockMaxer(gpus, strictPerf);
+
   char *data = nullptr;
   switch (allocMethod) {
   case SYSTEM: {
@@ -170,8 +186,9 @@ int main(int argc, char **argv) {
     }
     auto elapsed = (std::chrono::system_clock::now() - wct).count() / 1e9;
 
-    double bytesPerSec = nBytes / elapsed;
-    fmt::print("{} {} {}\n", nBytes, bytesPerSec, elapsed);
+    const size_t numUpdates = nBytes / gpus.size() * 1000;
+    const double updatesPerSec = numUpdates / elapsed;
+    fmt::print("{} {} {} {}\n", nBytes, numUpdates, updatesPerSec, elapsed);
   }
 
   // free memory

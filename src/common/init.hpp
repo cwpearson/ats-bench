@@ -2,6 +2,8 @@
 
 #include <spdlog/sinks/stdout_color_sinks.h>
 
+#include "check_nvml.cuh"
+
 /*! initialize the benchmark
  */
 void init() {
@@ -11,6 +13,9 @@ void init() {
 
   // create a logger and implicitly register it
   spdlog::stdout_color_mt("console");
+
+  // init nvml
+  NVML(nvmlInit());
 
   // don't init again if init() called twice
   init_ = true;
