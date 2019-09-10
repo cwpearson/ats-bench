@@ -156,7 +156,6 @@ int nProcessorsOnln() { return sysconf(_SC_NPROCESSORS_ONLN); }
 // https://docs.nvidia.com/deploy/nvml-api/group__nvmlDeviceCommands.html#group__nvmlDeviceCommands_1gc2a9a8db6fffb2604d27fd67e8d5d87f
 
 std::vector<unsigned int> get_device_memory_clocks(unsigned int index) {
-  NVML(nvmlInit());
   std::vector<unsigned int> result;
   nvmlDevice_t device;
   NVML(nvmlDeviceGetHandleByIndex(index, &device));
@@ -173,7 +172,6 @@ std::vector<unsigned int> get_device_memory_clocks(unsigned int index) {
 
 std::vector<unsigned int>
 get_device_graphics_clocks(unsigned int index, unsigned int memoryClockMhz) {
-  NVML(nvmlInit());
   std::vector<unsigned int> result;
   nvmlDevice_t device;
   NVML(nvmlDeviceGetHandleByIndex(index, &device));
@@ -247,10 +245,10 @@ struct WithoutBoost {
     if (enabled) {
       if (disable_boost()) {
         if (strict_) {
-          LOG(critical, "can't disable CPU boost");
+          LOG(critical, "failed to disable CPU boost");
           exit(EXIT_FAILURE);
         } else {
-          LOG(warn, "can't disable CPU boost");
+          LOG(warn, "failed to disable CPU boost");
         }
         restore = false;
       } else {
@@ -267,9 +265,9 @@ struct WithoutBoost {
       if (enabled) {
         if (enable_boost()) {
           if (strict_) {
-            LOG(critical, "unable to re-enable boost");
+            LOG(critical, "failed to re-enable boost");
           } else {
-            LOG(error, "unable to re-enable boost");
+            LOG(error, "failed to re-enable boost");
           }
         }
       }
@@ -309,7 +307,7 @@ struct WithMaxGPUClocks {
       ret =
           nvmlDeviceSetAutoBoostedClocksEnabled(device, NVML_FEATURE_DISABLED);
       if (ret == NVML_ERROR_NOT_SUPPORTED) {
-        LOG(warn, "GPU {} does not support disable boost clocks", WithMaxGPUClocks);
+        LOG(warn, "GPU {} does not support disable boost clocks", gpu);
       } else if (ret == NVML_ERROR_NO_PERMISSION) {
         LOG(warn,
             "user does not have permission to disable GPU {} boost clocks",
