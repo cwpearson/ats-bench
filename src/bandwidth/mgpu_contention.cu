@@ -39,7 +39,7 @@ __global__ void contention_kernel(volatile char *data, const size_t n,
 int main(int argc, char **argv) {
   init();
 
-  enum AllocMethod { SYSTEM, MANAGED };
+  enum AllocMethod { SYSTEM, MANAGED, MAPPED };
 
   bool help = false;
   bool debug = false;
@@ -70,6 +70,9 @@ int main(int argc, char **argv) {
               return lyra::parser_result::ok(lyra::parser_result_type::matched);
             } else if ("managed" == s) {
               allocMethod = MANAGED;
+              return lyra::parser_result::ok(lyra::parser_result_type::matched);
+            } else if ("mapped" == s) {
+              allocMethod = MAPPED;
               return lyra::parser_result::ok(lyra::parser_result_type::matched);
             } else {
               return lyra::parser_result::runtimeError(
@@ -146,6 +149,10 @@ int main(int argc, char **argv) {
     CUDA_RUNTIME(cudaMallocManaged(&data, nBytes));
     break;
   }
+  case MAPPED: {
+    CUDA_RUNTIME(cudaHostAlloc(&data, nBytes, cudaHostAllocMapped));
+    break;
+  }
   default: {
     LOG(error, "unexpected value for hostAllocMethod");
     exit(EXIT_FAILURE);
@@ -199,6 +206,10 @@ int main(int argc, char **argv) {
   }
   case MANAGED: {
     CUDA_RUNTIME(cudaFree(data));
+    break;
+  }
+  case MAPPED: {
+    CUDA_RUNTIME(cudaFreeHost(data));
     break;
   }
   default: {
