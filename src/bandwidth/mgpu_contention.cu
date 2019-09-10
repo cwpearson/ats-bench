@@ -6,6 +6,7 @@
 #include "common/init.hpp"
 #include "common/logger.hpp"
 #include "common/perf_control.hpp"
+#include "common/string.hpp"
 #include "common/test_system_allocator.hpp"
 
 /*!
@@ -26,7 +27,8 @@ __global__ void contention_kernel(volatile char *data, const size_t n,
                                   const size_t numWorkers) {
 
   // modify field when its in a chunk chunks % workerId == 0
-  for (size_t i = threadIdx.x + blockIdx.x * blockDim.x; i < n; i += gridDim.x * blockDim.x) {
+  for (size_t i = threadIdx.x + blockIdx.x * blockDim.x; i < n;
+       i += gridDim.x * blockDim.x) {
     size_t chunkIdx = (i / stride) * numWorkers + workerId;
     size_t fieldIdx = i % stride;
     size_t dataIdx = chunkIdx * stride + fieldIdx;
@@ -38,9 +40,18 @@ __global__ void contention_kernel(volatile char *data, const size_t n,
         data[dataIdx] += 1;
       }
     } else {
-    break;
+      break;
     }
   }
+}
+
+std::string get_header(const std::string &sep, const size_t nIters) {
+  std::string result;
+  result = "bmark" + sep + "stride";
+  for (size_t i = 0; i < nIters; ++i) {
+    result += sep + fmt::format("{}", i);
+  }
+  return result;
 }
 
 int main(int argc, char **argv) {
@@ -49,11 +60,13 @@ int main(int argc, char **argv) {
 
   enum AllocMethod { SYSTEM, MANAGED, MAPPED };
 
-  bool help = false;
   bool debug = false;
-  bool verbose = false;
+  bool headerOnly = false;
+  bool help = false;
   bool noAtsCheck = false;
+  std::string sep = ",";
   bool strictPerf = false;
+  bool verbose = false;
 
   std::vector<int> gpus;
   int nIters = 5;
@@ -64,6 +77,7 @@ int main(int argc, char **argv) {
   auto cli =
       lyra::help(help) |
       lyra::opt(debug)["--debug"]("print debug messages to stderr") |
+      lyra::opt(headerOnly)["--header-only"]("only print header") |
       lyra::opt(stride, "bytes")["--stride"]("stride length") |
       lyra::opt(verbose)["--verbose"]("print verbose messages to stderr") |
       lyra::opt(noAtsCheck)["--no-ats-check"]("skip test for ATS") |
@@ -122,6 +136,11 @@ int main(int argc, char **argv) {
       cmd += argv[i];
     }
     LOG(debug, cmd);
+  }
+
+  if (headerOnly) {
+    fmt::print("{}\n", get_header(sep, nIters));
+    exit(EXIT_SUCCESS);
   }
 
   if (gpus.empty()) {
@@ -190,6 +209,7 @@ int main(int argc, char **argv) {
     streams.push_back(stream);
   }
 
+  std::vector<double> updatesPerSec;
   for (int i = 0; i < nIters; ++i) {
 
     // run the workload
@@ -197,7 +217,8 @@ int main(int argc, char **argv) {
     for (size_t j = 0; j < gpus.size(); ++j) {
       auto gpu = gpus[j];
       auto stream = streams[j];
-      LOG(debug, "launch contention_kernel<<<250, 512, 0, {}>>> on {}", uintptr_t(stream), gpu);
+      LOG(debug, "launch contention_kernel<<<250, 512, 0, {}>>> on {}",
+          uintptr_t(stream), gpu);
       CUDA_RUNTIME(cudaSetDevice(gpu));
       contention_kernel<<<250, 512, 0, stream>>>(data, nBytes, stride, j,
                                                  gpus.size());
@@ -211,15 +232,17 @@ int main(int argc, char **argv) {
     auto elapsed = (std::chrono::system_clock::now() - wct).count() / 1e9;
 
     const size_t numUpdates = nBytes * 1000;
-    const double updatesPerSec = numUpdates / elapsed;
-    fmt::print("{} {} {} {} {} {}\n", "mgpu-contention", stride, numUpdates, elapsed, updatesPerSec, nBytes);
+    updatesPerSec.push_back(numUpdates / elapsed);
   }
+  std::string output = fmt::format("{}{}{}", "mgpu-contention", sep, stride);
+  output += sep + to_string(updatesPerSec);
+  fmt::print("{}\n", output);
 
   // check allocation
   // for (size_t i = 0; i < nBytes; ++i) {
   //   if (data[i] != data[0]) {
-  //     LOG(critical, "kernel bug: {}@{} != {}@0", int(data[i]), i, int(data[0]));
-  //     exit(EXIT_FAILURE);
+  //     LOG(critical, "kernel bug: {}@{} != {}@0", int(data[i]), i,
+  //     int(data[0])); exit(EXIT_FAILURE);
   //   }
   // }
 
