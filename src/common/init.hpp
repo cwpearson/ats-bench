@@ -12,7 +12,7 @@ void init() {
     return;
 
   // create a logger and implicitly register it
-  spdlog::stdout_color_mt("console");
+  spdlog::stderr_color_mt("console");
 
   // init nvml
   NVML(nvmlInit());
