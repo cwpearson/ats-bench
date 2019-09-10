@@ -7,7 +7,7 @@
 
 // write ints
 __global__ void write_int(int *a, size_t n) {
-  for (int i = threadIdx.x; i < n; i += gridDim.x * blockDim.x) {
+  for (int i = threadIdx.x + blockIdx.x * blockDim.x; i < n; i += gridDim.x * blockDim.x) {
     a[i] = i;
   }
 }
@@ -34,12 +34,12 @@ bool test_system_allocator() {
     write_int<<<512, 512>>>(a, 1024);
     cudaError_t err = cudaDeviceSynchronize();
     if (err == cudaErrorIllegalAddress) {
-      // fprintf(stderr, "got illegal address using system allocator\n");
+      fprintf(stderr, "got illegal address using system allocator\n");
       exit(1);
     }
     CUDA_RUNTIME(err);
     if (700 != a[700]) {
-      // fprintf(stderr, "write not visible on host\n");
+      fprintf(stderr, "write not visible on host\n");
       exit(1);
     }
     exit(0);
