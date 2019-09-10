@@ -47,7 +47,7 @@ __global__ void contention_kernel(volatile char *data, const size_t n,
 
 std::string get_header(const std::string &sep, const size_t nIters) {
   std::string result;
-  result = "bmark" + sep + "stride";
+  result = "bmark" + sep + "alloc" + sep + "stride" + sep + "gpus";
   for (size_t i = 0; i < nIters; ++i) {
     result += sep + fmt::format("{}", i);
   }
@@ -146,6 +146,10 @@ int main(int argc, char **argv) {
   if (gpus.empty()) {
     gpus.push_back(0);
   }
+  std::string gpuString;
+  for (auto gpu : gpus) {
+    gpuString += fmt::format("{}", gpu);
+  }
 
 #ifndef NDEBUG
   LOG(warn, "this is not a release build.");
@@ -234,7 +238,17 @@ int main(int argc, char **argv) {
     const size_t numUpdates = nBytes * 1000;
     updatesPerSec.push_back(numUpdates / elapsed);
   }
-  std::string output = fmt::format("{}{}{}", "mgpu-contention", sep, stride);
+  std::string allocMethodString;
+  if (SYSTEM == allocMethod) {
+    allocMethodString += "system";
+  } else if (MANAGED == allocMethod) {
+    allocMethodString += "managed";
+  } else if (MAPPED == allocMethod) {
+    allocMethodString += "mapped";
+  }
+  std::string output =
+      fmt::format("{}{}{}{}{}{}{}", "mgpu-contention", sep, allocMethodString,
+                  sep, stride, sep, gpuString);
   output += sep + to_string(updatesPerSec);
   fmt::print("{}\n", output);
 
