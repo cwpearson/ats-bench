@@ -29,7 +29,7 @@ __global__ void contention_kernel(volatile char *data, const size_t n,
   for (size_t i = threadIdx.x; i < n; i += gridDim.x * blockDim.x) {
     size_t chunkIdx = (i / stride) * numWorkers + workerId;
     size_t fieldIdx = i % stride;
-    size_t dataIdx = chunkIdx * numWorkers + fieldIdx;
+    size_t dataIdx = chunkIdx * stride * numWorkers + fieldIdx;
     for (size_t j = 0; j < 1000; ++j) {
       data[dataIdx] += 1;
     }
