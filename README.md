@@ -1,5 +1,10 @@
 # ats-bench
 
+| Branch | Status |
+|-|-|
+| develop | [![Build Status](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Factions-badge.atrox.dev%2Fcwpearson%2Fats-bench%2Fbadge%3Fref%3Ddevelop&style=flat)](https://actions-badge.atrox.dev/cwpearson/ats-bench/goto?ref=develop) |
+|master | [![Build Status](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Factions-badge.atrox.dev%2Fcwpearson%2Fats-bench%2Fbadge%3Fref%3Dmaster&style=flat)](https://actions-badge.atrox.dev/cwpearson/ats-bench/goto?ref=master) |
+
 Benchmarks for CUDA Address Translation Services
 
 ## Topics:
@@ -48,3 +53,4 @@ srun --partition=gpu-debug --pty --nodes=1 \
 * Uses [lyra](https://github.com/bfgroup/Lyra) for cli option parsing.
 * Uses [hunter](https://github.com/ruslo/hunter) for package management.
 * Uses [spdlog](https://github.com/gabime/spdlog) for logging.
+* Uses [Atrox/github-actions-badge](https://github.com/Atrox/github-actions-badge) for Github Actions status badge
