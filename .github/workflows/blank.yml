@@ -26,6 +26,7 @@ jobs:
     - name: build
       run: |
         export PATH=/usr/local/cuda/bin:$PATH
+        cd build
         g++ --version
         nvcc --version
         make
