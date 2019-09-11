@@ -29,9 +29,11 @@ int parse_double(double &d, const std::string &s) {
     result *= 1e6;
   } else if ("Mi" == symbol || "MiB" == symbol) {
     result *= 1024.0 * 1024.0;
-  } else if ("K" == symbol || "KB" == symbol) {
+  } else if ("k" == symbol || "kB" == symbol || "K" == symbol ||
+             "KB" == symbol) {
     result *= 1e3;
-  } else if ("Ki" == symbol || "KiB" == symbol) {
+  } else if ("ki" == symbol || "kiB" == symbol || "Ki" == symbol ||
+             "KiB" == symbol) {
     result *= 1024;
   } else if ("B" == symbol) {
     // okay
