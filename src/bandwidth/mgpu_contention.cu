@@ -24,7 +24,8 @@
 This kernel does (n / numWorkers) * 1000 updates to memory
 */
 __global__ void contention_kernel(volatile char *data, const size_t n,
-                                  const size_t stride, const size_t workerId,
+                                  const size_t stride, const size_t numMods,
+                                  const size_t workerId,
                                   const size_t numWorkers) {
 
   // modify field when its in a chunk chunks % workerId == 0
@@ -37,7 +38,8 @@ __global__ void contention_kernel(volatile char *data, const size_t n,
     //   printf("%lu %lu %lu %lu\n", i, chunkIdx, fieldIdx, dataIdx);
     // }
     if (dataIdx < n) {
-      for (size_t j = 0; j < 1000; ++j) {
+#pragma unroll(32)
+      for (size_t j = 0; j < numMods; ++j) {
         data[dataIdx] += 1;
       }
     } else {
@@ -48,7 +50,8 @@ __global__ void contention_kernel(volatile char *data, const size_t n,
 
 std::string get_header(const std::string &sep, const size_t nIters) {
   std::string result;
-  result = "bmark" + sep + "alloc" + sep + "gpus" + sep + "stride";
+  result = "bmark" + sep + "alloc" + sep + "gpus" + sep + "stride" + sep +
+           "bytes" + sep + "mods";
   for (size_t i = 0; i < nIters; ++i) {
     result += sep + fmt::format("{}", i);
   }
@@ -65,6 +68,7 @@ int main(int argc, char **argv) {
   bool headerOnly = false;
   bool help = false;
   bool noAtsCheck = false;
+  size_t nMods = 1000;
   std::string sep = ",";
   bool strictPerf = false;
   bool verbose = false;
@@ -86,7 +90,9 @@ int main(int argc, char **argv) {
       lyra::opt(strictPerf)["--strict-perf"](
           "fail if system performance cannot be controlled") |
       lyra::opt(nIters,
-                "iters")["-i"]["--iters"]("number of benchmark iterations") |
+                "INT")["-i"]["--iters"]("number of benchmark iterations") |
+      lyra::opt(nMods,
+                "INT")["--num-mods"]("number of modifications per byte") |
       lyra::opt(
           [&](std::string s) {
             if ("system" == s) {
@@ -103,10 +109,9 @@ int main(int argc, char **argv) {
                   "alloc-method must be system,managed");
             }
           },
-          "method")["--alloc-method"](
-          "host allocation method (system, managed)") |
-      lyra::opt(gpus, "device ids")["-g"]("gpus to use") |
-      lyra::arg(nBytesStr, "size")("Size of allocation in bytes").required();
+          "managed,mapped,system")["--alloc-method"]("host allocation method") |
+      lyra::opt(gpus, "device id")["-g"]("gpus to use") |
+      lyra::arg(nBytesStr, "INT")("Size of allocation in bytes").required();
 
   auto result = cli.parse({argc, argv});
   if (!result) {
@@ -234,7 +239,7 @@ int main(int argc, char **argv) {
       LOG(debug, "launch contention_kernel<<<250, 512, 0, {}>>> on {}",
           uintptr_t(stream), gpu);
       CUDA_RUNTIME(cudaSetDevice(gpu));
-      contention_kernel<<<250, 512, 0, stream>>>(data, nBytes, stride, j,
+      contention_kernel<<<250, 512, 0, stream>>>(data, nBytes, stride, nMods, j,
                                                  gpus.size());
       CUDA_RUNTIME(cudaGetLastError());
     }
@@ -245,7 +250,7 @@ int main(int argc, char **argv) {
     }
     auto elapsed = (std::chrono::system_clock::now() - wct).count() / 1e9;
 
-    const size_t numUpdates = nBytes * 1000;
+    const size_t numUpdates = nBytes * nMods;
     updatesPerSec.push_back(numUpdates / elapsed);
   }
   std::string allocMethodString;
@@ -256,9 +261,9 @@ int main(int argc, char **argv) {
   } else if (MAPPED == allocMethod) {
     allocMethodString += "mapped";
   }
-  std::string output =
-      fmt::format("{}{}{}{}{}{}{}", "mgpu-contention", sep, allocMethodString,
-                  sep, gpuString, sep, stride);
+  std::string output = fmt::format("{}{}{}{}{}{}{}{}{}{}{}", "mgpu-contention",
+                                   sep, allocMethodString, sep, gpuString, sep,
+                                   stride, sep, nBytes, sep, nMods);
   output += sep + to_string(updatesPerSec);
   fmt::print("{}\n", output);
 
