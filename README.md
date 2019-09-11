@@ -5,16 +5,29 @@
 | develop | [![Build Status](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Factions-badge.atrox.dev%2Fcwpearson%2Fats-bench%2Fbadge%3Fref%3Ddevelop&style=flat)](https://actions-badge.atrox.dev/cwpearson/ats-bench/goto?ref=develop) |
 |master | [![Build Status](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Factions-badge.atrox.dev%2Fcwpearson%2Fats-bench%2Fbadge%3Fref%3Dmaster&style=flat)](https://actions-badge.atrox.dev/cwpearson/ats-bench/goto?ref=master) |
 
-Benchmarks for CUDA Address Translation Services
+Benchmarks for unified memory handling on GPU
 
-## Topics:
+## Microbenchmarks
 
-* Raw Bandwidth
-  * Copy an array into GPU memory
-    - [ ] From CPU (cached)
-    - [ ] From CPU (uncached)
-* Access contention
-  - [ ] Interleave accesses and modifications to strided regions with multiple GPUs
+* How fast can system data be accessed?
+  * System buffer fill
+    - [ ] {aligned, unaligned} x {mapped/managed/system}
+  * System buffer copy
+    - [ ] {aligned, unaligned} x {mapped/managed/system}
+* What is the granularity of access
+  - Interleave modifications to strided regions with multiple GPUs
+    - [ ] {mapped/managed/system}
+* Are system atomics supported?
+  - [ ] {mapped/managed/system}
+* How fast can a memory region be created?
+  - [ ] Allocation + {no touch / cpu / gpu / both}
+
+## Benchmarks
+
+- [ ] Triangle Counting
+- [ ] GEMM
+
+
 
 ## Building
 
