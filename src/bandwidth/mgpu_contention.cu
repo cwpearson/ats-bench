@@ -5,6 +5,7 @@
 #include "common/check_cuda.cuh"
 #include "common/init.hpp"
 #include "common/logger.hpp"
+#include "common/metric_prefix.hpp"
 #include "common/perf_control.hpp"
 #include "common/string.hpp"
 #include "common/test_system_allocator.hpp"
@@ -70,9 +71,10 @@ int main(int argc, char **argv) {
 
   std::vector<int> gpus;
   int nIters = 5;
-  size_t nBytes = 1024 * 1024;
   size_t stride = 32;
   AllocMethod allocMethod = SYSTEM;
+
+  std::string nBytesStr = "10G";
 
   auto cli =
       lyra::help(help) |
@@ -104,7 +106,7 @@ int main(int argc, char **argv) {
           "method")["--alloc-method"](
           "host allocation method (system, managed)") |
       lyra::opt(gpus, "device ids")["-g"]("gpus to use") |
-      lyra::arg(nBytes, "size")("Size").required();
+      lyra::arg(nBytesStr, "size")("Size of allocation in bytes").required();
 
   auto result = cli.parse({argc, argv});
   if (!result) {
@@ -142,6 +144,14 @@ int main(int argc, char **argv) {
     fmt::print("{}\n", get_header(sep, nIters));
     exit(EXIT_SUCCESS);
   }
+
+  // try to convert nBytes
+  size_t nBytes;
+  if (parse_u64(nBytes, nBytesStr)) {
+    LOG(critical, "Failed to parse {}", nBytesStr);
+    exit(EXIT_FAILURE);
+  }
+  LOG(debug, "nBytes = {}", nBytes);
 
   if (gpus.empty()) {
     gpus.push_back(0);
