@@ -67,3 +67,12 @@ srun --partition=gpu-debug --pty --nodes=1 \
 * Uses [hunter](https://github.com/ruslo/hunter) for package management.
 * Uses [spdlog](https://github.com/gabime/spdlog) for logging.
 * Uses [Atrox/github-actions-badge](https://github.com/Atrox/github-actions-badge) for Github Actions status badge
+
+## Related Work
+
+### 2014
+Landaverde, Raphael, et al. "An investigation of unified memory access performance in cuda." 2014 IEEE High Performance Extreme Computing Conference (HPEC). IEEE, 2014. [pdf](https://ieeexplore.ieee.org/iel7/7027306/7040940/07040988.pdf)
+
+### 2015
+Li, Wenqiang, et al. "An evaluation of unified memory technology on nvidia gpus." 2015 15th IEEE/ACM International Symposium on Cluster, Cloud and Grid Computing. IEEE, 2015. [pdf](http://hpc.sjtu.edu.cn/ppmm15_uma.pdf)
+
