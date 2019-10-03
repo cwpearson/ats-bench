@@ -21,6 +21,7 @@ Benchmarks for unified memory handling on GPU
   - [ ] {mapped/managed/system}
 * How fast can a memory region be created?
   - [ ] Allocation + {no touch / cpu / gpu / both}
+* Page Fault cost
 
 ## Benchmarks
 
